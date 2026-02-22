@@ -59,6 +59,7 @@ var (
 	bridge           string
 	bridgeNetwork    string
 	bridgeNamespace  string
+	multusNetworks   string
 	promURL          string
 	id               string
 	searchURL        string
@@ -174,6 +175,7 @@ var rootCmd = &cobra.Command{
 			ClientSet:       client,
 			BridgeNetwork:   bridge,
 			BridgeNamespace: bridgeNamespace,
+			MultusNetworks:  multusNetworks,
 			Cudn:            cudn != "",
 			IbWriteBwParams: ibWriteBw,
 			Sockets:         sockets,
@@ -649,6 +651,15 @@ func executeWorkload(nc config.Config,
 
 		// Set bridge info similar to UdnInfo
 		npr.BridgeInfo = fmt.Sprintf("%s/%s", s.BridgeNamespace, s.BridgeNetwork)
+	} else if s.MultusNetworks != "" {
+		// For SR-IOV and MacVLAN networks, extract secondary interface (eth1) IP from networks-status
+		serverIP, err = k8s.ExtractSecondaryNetworkIp(s.Server.Items[0])
+		if err != nil {
+			log.Warnf("⚠️  Failed to extract secondary network IP (eth1): %v - falling back to primary pod IP. Test results may not reflect secondary network performance.", err)
+			// Fall back to primary pod IP
+			serverIP = s.Server.Items[0].Status.PodIP
+		}
+		log.Debugf("Using secondary network (eth1) IP: %s", serverIP)
 	} else if s.BridgeServerNetwork != "" {
 		// For VMs, use static bridge IP from JSON config
 		serverIP = strings.Split(s.BridgeServerNetwork, "/")[0]
@@ -769,6 +780,7 @@ func main() {
 	rootCmd.Flags().StringVar(&bridge, "bridge", "", "Name of the NetworkAttachmentDefinition to be used for bridge interface")
 	rootCmd.Flags().StringVar(&bridgeNamespace, "bridgeNamespace", "default", "Namespace of the NetworkAttachmentDefinition for bridge interface (default default)")
 	rootCmd.Flags().StringVar(&bridgeNetwork, "bridgeNetwork", "bridgeNetwork.json", "Json file for the VM network defined by the bridge interface - bridge should be enabled (default bridgeNetwork.json)")
+	rootCmd.Flags().StringVar(&multusNetworks, "multus-networks", "", "JSON array for robin.io/networks annotation to attach SR-IOV or MacVLAN secondary networks, e.g. '[{\"ippool\": \"pool1\", \"trust\": \"on\"}]'")
 	rootCmd.Flags().StringVar(&promURL, "prom", "", "Prometheus URL")
 	rootCmd.Flags().StringVar(&id, "uuid", "", "User provided UUID")
 	rootCmd.Flags().StringVar(&searchURL, "search", "", "OpenSearch URL, if you have auth, pass in the format of https://user:pass@url:port")

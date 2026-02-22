@@ -58,6 +58,7 @@ type PerfScenarios struct {
 	BridgeNamespace     string
 	BridgeServerNetwork string
 	BridgeClientNetwork string
+	MultusNetworks      string
 	IbWriteBwParams     string
 	Sockets             uint32
 	Cores               uint32
