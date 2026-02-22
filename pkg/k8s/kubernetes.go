@@ -148,6 +148,18 @@ func buildCUdnNetworkAnnotations(cudn string) map[string]string {
 	return annotations
 }
 
+// buildMultusNetworkAnnotations creates the robin.io/networks annotation for SR-IOV and MacVLAN networks.
+// The multusNetworks parameter is a JSON array following the robin.io annotation semantic,
+// e.g. '[{"ippool": "ippool_name", "trust": "on", "spoofchk": "off"}]'.
+func buildMultusNetworkAnnotations(multusNetworks string) map[string]string {
+	annotations := make(map[string]string)
+	if multusNetworks != "" {
+		annotations["robin.io/networks"] = multusNetworks
+		log.Infof("🌉 Configuring Multus network (SR-IOV/MacVLAN): %s", multusNetworks)
+	}
+	return annotations
+}
+
 // BuildInfra will create the infra for the SUT
 func BuildInfra(client *kubernetes.Clientset, udn bool) error {
 	_, err := client.CoreV1().Namespaces().Get(context.TODO(), namespace, metav1.GetOptions{})
@@ -397,6 +409,8 @@ func BuildSUT(client *kubernetes.Clientset, s *config.PerfScenarios) error {
 			networkAnnotations = buildBridgeNetworkAnnotations(s.BridgeNetwork, s.BridgeNamespace)
 		} else if s.Cudn {
 			networkAnnotations = buildCUdnNetworkAnnotations(CudnName)
+		} else if s.MultusNetworks != "" {
+			networkAnnotations = buildMultusNetworkAnnotations(s.MultusNetworks)
 		}
 		cdp := DeploymentParams{
 			Name:               "client",
@@ -481,6 +495,8 @@ func BuildSUT(client *kubernetes.Clientset, s *config.PerfScenarios) error {
 			networkAnnotations = buildBridgeNetworkAnnotations(s.BridgeNetwork, s.BridgeNamespace)
 		} else if s.Cudn {
 			networkAnnotations = buildCUdnNetworkAnnotations(CudnName)
+		} else if s.MultusNetworks != "" {
+			networkAnnotations = buildMultusNetworkAnnotations(s.MultusNetworks)
 		}
 		cdp := DeploymentParams{
 			Name:               "client",
@@ -633,6 +649,8 @@ func BuildSUT(client *kubernetes.Clientset, s *config.PerfScenarios) error {
 		networkAnnotations = buildBridgeNetworkAnnotations(s.BridgeNetwork, s.BridgeNamespace)
 	} else if s.Cudn {
 		networkAnnotations = buildCUdnNetworkAnnotations(CudnName)
+	} else if s.MultusNetworks != "" {
+		networkAnnotations = buildMultusNetworkAnnotations(s.MultusNetworks)
 	}
 	cdpAcross := DeploymentParams{
 		Name:               "client-across",
@@ -941,6 +959,46 @@ func ExtractBridgeIp(pod corev1.Pod, bridgeNetworkName, bridgeNamespace string) 
 	}
 
 	return "", fmt.Errorf("bridge network IP not found for %s on pod %s", expectedNetworkName, pod.Name)
+}
+
+// ExtractSecondaryNetworkIp extracts the IP address assigned to the secondary network interface (eth1)
+// from the k8s.v1.cni.cncf.io/networks-status pod annotation. This is used for SR-IOV and MacVLAN
+// networks configured via the robin.io/networks annotation.
+// It prefers IPv4; if no IPv4 is found it returns the first available IP on the eth1 interface.
+func ExtractSecondaryNetworkIp(pod corev1.Pod) (string, error) {
+	networkStatusJson := pod.Annotations["k8s.v1.cni.cncf.io/networks-status"]
+	if networkStatusJson == "" {
+		return "", fmt.Errorf("no network status annotation found on pod %s", pod.Name)
+	}
+
+	var networkStatuses []struct {
+		Name      string   `json:"name"`
+		Interface string   `json:"interface"`
+		IPs       []string `json:"ips"`
+		Default   bool     `json:"default,omitempty"`
+	}
+
+	err := json.Unmarshal([]byte(networkStatusJson), &networkStatuses)
+	if err != nil {
+		return "", fmt.Errorf("error unmarshalling network status: %v", err)
+	}
+
+	for _, netStatus := range networkStatuses {
+		if netStatus.Interface == "eth1" && len(netStatus.IPs) > 0 {
+			// Prefer IPv4
+			for _, ip := range netStatus.IPs {
+				if parsed := net.ParseIP(ip); parsed != nil && parsed.To4() != nil {
+					log.Debugf("Pod %s secondary network (eth1) IPv4: %s", pod.Name, ip)
+					return ip, nil
+				}
+			}
+			// Fall back to first available IP (e.g. IPv6)
+			log.Debugf("Pod %s secondary network (eth1) IP: %s", pod.Name, netStatus.IPs[0])
+			return netStatus.IPs[0], nil
+		}
+	}
+
+	return "", fmt.Errorf("secondary network IP (eth1) not found on pod %s", pod.Name)
 }
 
 // Extract the UDN Ip address of the server (or the client) from the annotations - Support only ipv4
