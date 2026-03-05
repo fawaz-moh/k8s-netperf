@@ -32,6 +32,7 @@ type Config struct {
 	MessageSize int    `yaml:"messagesize,omitempty"`
 	Burst       int    `yaml:"burst,omitempty"`
 	Service     bool   `default:"false" yaml:"service,omitempty"`
+	RandSrcPort bool   `default:"false" yaml:"randsrcport,omitempty"`
 	Metric      string
 	AcrossAZ    bool
 }

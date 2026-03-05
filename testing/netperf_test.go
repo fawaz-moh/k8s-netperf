@@ -59,3 +59,23 @@ func TestBadParseConf(t *testing.T) {
 		t.Fatal("Parsing config file should have failed but succeeded")
 	}
 }
+
+// TestMultiFlowConf verifies successful parsing of a multi-flow config with randsrcport.
+func TestMultiFlowConf(t *testing.T) {
+	file := "test-multiflow-config.yml"
+	cfgs, err := config.ParseV2Conf(file)
+	if err != nil {
+		t.Fatalf("Parsing multi-flow config file failed: %v", err)
+	}
+	if len(cfgs) == 0 {
+		t.Fatal("Expected at least one config, got none")
+	}
+	for _, c := range cfgs {
+		if c.Parallelism < 100 {
+			t.Errorf("Expected parallelism >= 100, got %d", c.Parallelism)
+		}
+		if !c.RandSrcPort {
+			t.Errorf("Expected randsrcport to be true")
+		}
+	}
+}
