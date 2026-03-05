@@ -86,6 +86,9 @@ func (i *iperf3) Run(c *kubernetes.Clientset,
 			"-p", fmt.Sprint(k8s.IperfServerCtlPort),
 			fmt.Sprintf("--logfile=%s", file),
 		}
+		if nc.RandSrcPort {
+			cmd = append(cmd, "--cport", "0")
+		}
 	} else {
 		cmd = []string{"iperf3", "-J", "-P", strconv.Itoa(nc.Parallelism), "-c",
 			serverIP, "-t",
@@ -94,6 +97,9 @@ func (i *iperf3) Run(c *kubernetes.Clientset,
 			"-p", fmt.Sprint(k8s.IperfServerCtlPort),
 			"-b", "0",
 			fmt.Sprintf("--logfile=%s", file),
+		}
+		if nc.RandSrcPort {
+			cmd = append(cmd, "--cport", "0")
 		}
 	}
 	log.Debug(cmd)

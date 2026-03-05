@@ -1,0 +1,22 @@
+---
+# Multi-flow test configuration
+# Deploys client/server targets with 100+ flows, each using a different
+# random source port. This is useful for testing ECMP load-balancing,
+# where distinct 5-tuples (src_ip, src_port, dst_ip, dst_port, proto)
+# are required to distribute traffic across multiple network paths.
+tests:
+  - TCPStreamMultiFlow:
+    parallelism: 128
+    profile: "TCP_STREAM"
+    duration: 30
+    samples: 3
+    messagesize: 1024
+    randsrcport: true
+
+  - UDPStreamMultiFlow:
+    parallelism: 128
+    profile: "UDP_STREAM"
+    duration: 30
+    samples: 3
+    messagesize: 1024
+    randsrcport: true

@@ -1,0 +1,9 @@
+---
+tests:
+  - TCPStreamMultiFlow:
+    parallelism: 128
+    profile: "TCP_STREAM"
+    duration: 10
+    samples: 1
+    messagesize: 1024
+    randsrcport: true

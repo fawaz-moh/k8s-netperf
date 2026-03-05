@@ -15,6 +15,7 @@ tests :
     messagesize: 1024       # Size of the data-gram
     burst: 1                # Number of transactions inflight at one time. By default, netperf does one transaction at a time. This is netperf's TCP_RR specific option. 
     service: false          # If we should test with the server pod behind a service
+    randsrcport: false      # If true, each parallel flow uses a random OS-assigned source port (useful for ECMP testing)
 ```
 
 ### Config File v1
@@ -31,10 +32,28 @@ TCPStream:                 # Place-holder of a test name
    messagesize: 1024       # Size of the data-gram
    burst: 1                # Number of transactions inflight at one time. By default, netperf does one transaction at a time. This is netperf's TCP_RR specific option. 
    service: false          # If we should test with the server pod behind a service
+   randsrcport: false      # If true, each parallel flow uses a random OS-assigned source port (useful for ECMP testing)
 ```
 
 ### Parallelism
 In most cases setting parallelism greater than 1 is OK, when using `service: true`, multiple threads (or processes in netperf) connect to the same service.
+
+### Random Source Ports (randsrcport)
+Setting `randsrcport: true` causes each parallel flow to use a random OS-assigned source port. This is particularly useful for ECMP (Equal-Cost Multi-Path) testing, where distinct flow 5-tuples (src_ip, src_port, dst_ip, dst_port, proto) are required to distribute traffic across multiple network paths.
+
+When combined with high `parallelism` (e.g. 128), this creates 100+ flows each with a unique random source port:
+```yml
+tests:
+  - TCPStreamMultiFlow:
+    parallelism: 128
+    profile: "TCP_STREAM"
+    duration: 30
+    samples: 3
+    messagesize: 1024
+    randsrcport: true
+```
+
+See `examples/netperf-multiflow.yml` for a ready-to-use multi-flow configuration.
 
 ## Supported Benchmarks
 
